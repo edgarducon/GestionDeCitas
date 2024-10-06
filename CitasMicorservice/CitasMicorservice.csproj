@@ -192,6 +192,7 @@
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
+    <Compile Include="Interfaces\IRecetasRepository.cs" />
     <Compile Include="Models\Citas.cs" />
     <Compile Include="Models\EstadoCita.cs" />
     <Compile Include="Models\CitasDbContext.cs" />
@@ -265,7 +266,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="App_Data\" />
-    <Folder Include="Interfaces\" />
     <Folder Include="Repository\" />
   </ItemGroup>
   <ItemGroup>

@@ -10,6 +10,8 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
 using Newtonsoft.Json;
+using RecetasMicorservice.Interfaces;
+using System.Threading.Tasks;
 
 namespace RecetasMicroservice.Controllers
 {
@@ -17,15 +19,17 @@ namespace RecetasMicroservice.Controllers
     public class RecetasController : ApiController
     {
 
-        private RecetasDbContext db = new RecetasDbContext();
 
-        public RecetasController()
+        private readonly IRecetasRepository _recetasRepository;
+        public RecetasController(IRecetasRepository RecetasRepository)
         {
-             StartRabbitMQListener();
+            _recetasRepository = RecetasRepository;
+            StartRabbitMQListener();
+
         }
         private void StartRabbitMQListener()
         {
-            var factory = new ConnectionFactory() { HostName = "localhost" };
+            var factory = new ConnectionFactory() { HostName = "localhost", Port = 5672 };
             using (var connection = factory.CreateConnection())
             using (var channel = connection.CreateModel())
             {
@@ -68,12 +72,10 @@ namespace RecetasMicroservice.Controllers
                     MedicoId = recetaData.MedicoId,
                     FechaEmision = DateTime.Now,
                     Descripcion = recetaData.Descripcion,
-                    EstadoRecetaId = 1 
+                    EstadoRecetaId = 1,
+                    CodigoUnico = Guid.NewGuid().ToString()
                 };
-             
-                db.Recetas.Add(nuevaReceta);
-                db.SaveChanges();
-
+                bool respuesta = _recetasRepository.CreateRecetaFromMessage(nuevaReceta);
                 Console.WriteLine($"[x] Receta creada para la cita ID: {nuevaReceta.CitaId}");
             }
             catch (Exception ex)
@@ -87,7 +89,7 @@ namespace RecetasMicroservice.Controllers
         [Route("")]
         public IHttpActionResult GetRecetas()
         {
-            var recetas = db.Recetas.ToList();
+            var recetas = _recetasRepository.GetRecetas();
             return Ok(recetas);
         }
 
@@ -96,7 +98,7 @@ namespace RecetasMicroservice.Controllers
         [Route("{id:int}")]
         public IHttpActionResult GetReceta(int id)
         {
-            var receta = db.Recetas.Find(id);
+            var receta = _recetasRepository.GetReceta(id);
             if (receta == null)
             {
                 return NotFound();
@@ -107,15 +109,13 @@ namespace RecetasMicroservice.Controllers
         // POST: recetas
         [HttpPost]
         [Route("")]
-        public IHttpActionResult CreateReceta(Recetas receta)
+        public async Task<IHttpActionResult> CreateReceta(Recetas receta)
         {
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
             }
-
-            db.Recetas.Add(receta);
-            db.SaveChanges();
+            Recetas recetas = await _recetasRepository.CreateReceta(receta);
 
             return Created(new Uri(Request.RequestUri + "/" + receta.Id), receta);
         }
@@ -123,32 +123,17 @@ namespace RecetasMicroservice.Controllers
         // PUT: recetas/{id}
         [HttpPut]
         [Route("{id:int}")]
-        public IHttpActionResult UpdateReceta(int id, [FromBody] Recetas receta)
+        public async Task<IHttpActionResult> UpdateReceta(int id, [FromBody] Recetas receta)
         {
             if (!ModelState.IsValid)
-            {
                 return BadRequest(ModelState);
-            }
 
-            var existingReceta = db.Recetas.Find(id);
-            if (existingReceta == null)
-            {
+            Recetas updatedReceta = await _recetasRepository.UpdateReceta(id, receta);
+
+            if (updatedReceta == null)
                 return NotFound();
-            }
 
-            // Actualizar los campos
-            existingReceta.CodigoUnico = receta.CodigoUnico;
-            existingReceta.FechaEmision = receta.FechaEmision;
-            existingReceta.EstadoRecetaId = receta.EstadoRecetaId;
-            existingReceta.MedicoId = receta.MedicoId;
-            existingReceta.PacienteId = receta.PacienteId;
-            existingReceta.CitaId = receta.CitaId;
-            existingReceta.Descripcion = receta.Descripcion;
-
-            db.Entry(existingReceta).State = EntityState.Modified;
-            db.SaveChanges();
-
-            return Ok(existingReceta);
+            return Ok(updatedReceta);
         }
 
         // DELETE: recetas/{id}
@@ -156,15 +141,9 @@ namespace RecetasMicroservice.Controllers
         [Route("{id:int}")]
         public IHttpActionResult DeleteReceta(int id)
         {
-            var receta = db.Recetas.Find(id);
+            var receta = _recetasRepository.DeleteReceta(id);
             if (receta == null)
-            {
                 return NotFound();
-            }
-
-            db.Recetas.Remove(receta);
-            db.SaveChanges();
-
             return Ok(receta);
         }
     }

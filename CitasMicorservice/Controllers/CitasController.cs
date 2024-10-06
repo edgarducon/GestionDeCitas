@@ -90,7 +90,7 @@ namespace CitasMicroservice.Controllers
 
         private void SendMessageToRabbitMQ(Citas cita)
         {
-            var factory = new ConnectionFactory() { HostName = "localhost" };
+            var factory = new ConnectionFactory() { HostName = "localhost", Port = 5672 };
             using (var connection = factory.CreateConnection())
             using (var channel = connection.CreateModel())
             {
@@ -100,11 +100,11 @@ namespace CitasMicroservice.Controllers
                                      autoDelete: false,
                                      arguments: null);
 
-                // Crear un mensaje (por ejemplo, los datos de la cita)
-                string message = $"{{ \"CitaId\": {cita.Id}, \"PacienteId\": {cita.PacienteId}, \"MedicoId\": {cita.MedicoId}, \"FechaCita\": \"{cita.FechaCita}\", \"Descripcion\": \"Receta generada tras cita enviada\" }}";
+                string fechaCitaFormatted = cita.FechaCita.ToString("yyyy-MM-dd");
+
+                string message = $"{{ \"CitaId\": {cita.Id}, \"PacienteId\": {cita.PacienteId}, \"MedicoId\": {cita.MedicoId}, \"FechaCita\": \"{fechaCitaFormatted}\", \"Descripcion\": \"Receta generada tras cita enviada\" }}";
                 var body = Encoding.UTF8.GetBytes(message);
 
-                // Enviar el mensaje
                 channel.BasicPublish(exchange: "",
                                      routingKey: "recetas_queue",
                                      basicProperties: null,
@@ -113,6 +113,7 @@ namespace CitasMicroservice.Controllers
                 Console.WriteLine($"[x] Mensaje enviado: {message}");
             }
         }
+
 
         // DELETE: citas/{id}
         [HttpDelete]
